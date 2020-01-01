@@ -1,57 +1,59 @@
 #########################################################################
-# Title:            Community: GoPlaxt                                  #
-# Author(s):        EnorMOZ                                             #
-# URL:              https://github.com/Cloudbox/Community               #
-# Docker Image(s):  xanderstrike/goplaxt                                #
+# Title:         Community: Resilio Sync                                #
+# Author(s):     l3uddz, desimaniac                                     #
+# URL:           https://github.com/Cloudbox/Community                  #
+# Docker Image:  resilio/sync                                           #
 # --                                                                    #
 #         Part of the Cloudbox project: https://cloudbox.works          #
 #########################################################################
 #                   GNU General Public License v3.0                     #
 #########################################################################
 ---
-- name: "Setting CloudFlare DNS Record"
+- name: Legacy Migration Tasks
+  import_tasks: "subtasks/legacy_migration.yml"
+
+- name: Create DNS Record
   include_role:
-    name: cloudflare-dns
+    name: dns
   vars:
-    record: goplaxt
+    record: resilio-sync
   when: cloudflare_enabled
 
 - name: Stop and remove any existing container
   docker_container:
-    name: goplaxt
+    name: resilio-sync
     state: absent
 
-- name: Create goplaxt directories
+- name: Create directories
   file: "path={{ item }} state=directory mode=0775 owner={{ user.name }} group={{ user.name }}"
   with_items:
-    - /opt/goplaxt
+    - /opt/resilio-sync
 
 - name: Create and start container
   docker_container:
-    name: goplaxt
-    image: xanderstrike/goplaxt
+    name: resilio-sync
+    image: "resilio/sync"
     pull: yes
     published_ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8888:8888"
+      - "55555:55555"
+    user: "{{ uid }}:{{ gid }}"
     env:
-      TZ: "{{ tz }}"
-      PUID: "{{ uid }}"
-      PGID: "{{ gid }}"
-      VIRTUAL_HOST: "goplaxt.{{ user.domain }}"
-      VIRTUAL_PORT: "8000"
-      LETSENCRYPT_HOST: "goplaxt.{{ user.domain }}"
+      VIRTUAL_HOST: "resilio-sync.{{ user.domain }}"
+      VIRTUAL_PORT: "8888"
+      LETSENCRYPT_HOST: "resilio-sync.{{ user.domain }}"
       LETSENCRYPT_EMAIL: "{{ user.email }}"
-      TRAKT_ID: "{{ goplaxt.trakt_id }}"
-      TRAKT_secret: "{{ goplaxt.trakt_secret }}"
-      REDIRECT_URI: "https://goplaxt.{{ user.domain }}"
+      TZ: "{{ tz }}"
     volumes:
-      - "/opt/goplaxt:/app/keystore"
+      - "/opt/resilio-sync:/mnt/sync"
+      - "/mnt:/mnt/mounted_folders/mnt"
+      - "/home:/mnt/mounted_folders/home"
     labels:
       "com.github.cloudbox.cloudbox_managed": "true"
     networks:
       - name: cloudbox
         aliases:
-          - goplaxt
+          - resilio-sync
     purge_networks: yes
     restart_policy: unless-stopped
     state: started
